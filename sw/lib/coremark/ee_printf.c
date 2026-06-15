@@ -15,7 +15,8 @@
 #include <stdarg.h>
 #include "printf.h"
 
-int ee_printf(const char *fmt, ...) {
+int ee_printf(const char *fmt, ...)
+{
     va_list args;
     va_start(args, fmt);
     int ret = vprintf_(fmt, args);
