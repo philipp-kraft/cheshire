@@ -132,7 +132,7 @@ portable_init(core_portable *p, int *argc, char *argv[])
     uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
     uart_init(&__uart_base_addr__, reset_freq, __BOOT_BAUDRATE);
 
-    ee_printf("CoreMark start\n");
+    ee_printf("CoreMark init\n");
 
     (void)argc;
     (void)argv;
