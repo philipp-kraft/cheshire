@@ -48,6 +48,21 @@ CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/base/*.c)
 CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/dif/*.c)
 CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/dif/autogen/*.c)
 
+###########
+# CoreMark #
+###########
+
+COREMARK_ITERATIONS     ?= 4000
+COREMARK_CLOCKS_PER_SEC ?= 200000000
+
+CHS_SW_DEPS_INCS += -I$(CHS_SW_DIR)/deps/coremark
+CHS_SW_DEPS_INCS += -I$(CHS_SW_DIR)/include/coremark
+CHS_SW_DEPS_SRCS += $(filter-out %/core_main.c,$(wildcard $(CHS_SW_DIR)/deps/coremark/*.c))
+
+CHS_SW_CCFLAGS += -DITERATIONS=$(COREMARK_ITERATIONS) \
+                  -DCLOCKS_PER_SEC=$(COREMARK_CLOCKS_PER_SEC) \
+                  -DFLAGS_STR='"$(CHS_SW_FLAGS)"'
+
 #############
 # Libraries #
 #############

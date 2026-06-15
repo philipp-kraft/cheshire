@@ -15,6 +15,13 @@ limitations under the License.
 
 Original Author: Shay Gal-on
 */
+
+#include "regs/cheshire.h"
+#include "dif/clint.h"
+#include "dif/uart.h"
+#include "params.h"
+#include "util.h"
+
 /* Topic : Description
         This file contains configuration constants required to execute on
    different platforms
@@ -35,14 +42,14 @@ Original Author: Shay Gal-on
         and implementation of functions thereof.
 */
 #ifndef HAS_TIME_H
-#define HAS_TIME_H 1
+#define HAS_TIME_H 0
 #endif
 /* Configuration : USE_CLOCK
         Define to 1 if platform has the time.h header file,
         and implementation of functions thereof.
 */
 #ifndef USE_CLOCK
-#define USE_CLOCK 1
+#define USE_CLOCK 0
 #endif
 /* Configuration : HAS_STDIO
         Define to 1 if the platform has stdio.h.
@@ -87,11 +94,13 @@ Original Author: Shay Gal-on
 typedef signed short   ee_s16;
 typedef unsigned short ee_u16;
 typedef signed int     ee_s32;
-typedef double         ee_f32;
+typedef float          ee_f32;
+typedef double         ee_f64;
 typedef unsigned char  ee_u8;
 typedef unsigned int   ee_u32;
-typedef ee_u32         ee_ptr_int;
-typedef size_t         ee_size_t;
+typedef unsigned long  ee_u64;
+typedef ee_u64         ee_ptr_int;
+typedef ee_u64         ee_size_t;
 #define NULL ((void *)0)
 /* align_mem :
         This macro is used to align an offset to point to a 32b value. It is
@@ -102,8 +111,8 @@ typedef size_t         ee_size_t;
 /* Configuration : CORE_TICKS
         Define type of return from the timing functions.
  */
-#define CORETIMETYPE ee_u32
-typedef ee_u32 CORE_TICKS;
+#define CORETIMETYPE ee_u64
+typedef ee_u64 CORE_TICKS;
 
 /* Configuration : SEED_METHOD
         Defines method to get seed values that cannot be computed at compile
@@ -127,7 +136,7 @@ typedef ee_u32 CORE_TICKS;
         MEM_STACK - to allocate the data block on the stack (NYI).
 */
 #ifndef MEM_METHOD
-#define MEM_METHOD MEM_STACK
+#define MEM_METHOD MEM_STATIC
 #endif
 
 /* Configuration : MULTITHREAD

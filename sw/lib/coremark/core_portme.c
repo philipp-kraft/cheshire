@@ -44,8 +44,7 @@ volatile ee_s32 seed5_volatile = 0;
 CORETIMETYPE
 barebones_clock()
 {
-#error \
-    "You must implement a method to measure time in barebones_clock()! This function should return current time.\n"
+    return (CORETIMETYPE)get_mcycle();
 }
 /* Define : TIMER_RES_DIVIDER
         Divider to trade off timer resolution and total time that can be
@@ -129,11 +128,14 @@ ee_u32 default_num_contexts = 1;
 void
 portable_init(core_portable *p, int *argc, char *argv[])
 {
-#error \
-    "Call board initialization routines in portable init (if needed), in particular initialize UART!\n"
+    uint32_t rtc_freq   = CHS_REGS->rtc_freq.f.ref_freq;
+    uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
+    uart_init(&__uart_base_addr__, reset_freq, __BOOT_BAUDRATE);
 
-    (void)argc; // prevent unused warning
-    (void)argv; // prevent unused warning
+    ee_printf("CoreMark start\n");
+
+    (void)argc;
+    (void)argv;
 
     if (sizeof(ee_ptr_int) != sizeof(ee_u8 *))
     {
