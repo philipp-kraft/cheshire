@@ -16,18 +16,18 @@ limitations under the License.
 Original Author: Shay Gal-on
 */
 
-#include "regs/cheshire.h"
-#include "dif/clint.h"
-#include "dif/uart.h"
-#include "params.h"
-#include "util.h"
-
 /* Topic : Description
         This file contains configuration constants required to execute on
    different platforms
 */
 #ifndef CORE_PORTME_H
 #define CORE_PORTME_H
+
+#include "params.h"
+#include "util.h"
+#include "dif/clint.h"
+#include "dif/uart.h"
+
 /************************/
 /* Data types and settings */
 /************************/
@@ -80,7 +80,7 @@ Original Author: Shay Gal-on
     FLAGS_STR /* "Please put compiler flags here (e.g. -o3)" */
 #endif
 #ifndef MEM_LOCATION
-#define MEM_LOCATION "STACK"
+#define MEM_LOCATION "STATIC"
 #endif
 
 /* Data Types :
