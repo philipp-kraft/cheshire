@@ -62,8 +62,7 @@ COREMARK_BASE_FLAGS ?= -DOT_PLATFORM_RV32 -march=rv64gc_zifencei -mabi=lp64d -ms
                        -O3 \
                        -fno-tree-loop-distribute-patterns \
                        -funroll-all-loops \
-                       -falign-jumps=4 \
-                       -falign-functions=16
+                       -falign-jumps=4
 
 COREMARK_SW_FLAGS ?= $(COREMARK_BASE_FLAGS)
 
