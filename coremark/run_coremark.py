@@ -3,16 +3,20 @@
 
 import argparse
 import datetime
+import os
 import re
 import subprocess
 import sys
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT  = os.path.dirname(_SCRIPT_DIR)
 
 SSH_HOST      = "weissenstein"
 FPGA_CLASS    = "genesys2"
 FPGA_LEASE    = "1h"
 BAUD          = 115200
-LOG_DIR       = "logs"
-COREMARK_ELF  = "sw/tests/coremark.spm.elf"
+LOG_DIR       = os.path.join(_SCRIPT_DIR, "logs")
+COREMARK_ELF  = os.path.join(_REPO_ROOT, "sw/tests/coremark.spm.elf")
 OPENOCD_TCL   = "cheshire-target.tcl"
 
 _C = {
@@ -29,7 +33,6 @@ _logfile = None
 
 def _open_log():
     global _logfile
-    import os
     os.makedirs(LOG_DIR, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = os.path.join(LOG_DIR, f"coremark_{ts}.log")
@@ -121,7 +124,6 @@ def find_uart(host, board):
 
 
 def start_uart_log(host, uart):
-    import os
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(LOG_DIR, f"uart_{ts}.log")
     # Kill any stale process still holding the device from a previous run
@@ -195,6 +197,7 @@ def flash(board, tcp_port, jtag_sn):
             f"CHS_XILINX_HWS_PATH_{FPGA_CLASS}={{xilinx_tcf/*/{jtag_sn}*}}",
         ],
         check=True,
+        cwd=_REPO_ROOT,
     )
     log("OK", f"Flash complete")
 
