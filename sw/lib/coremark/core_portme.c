@@ -131,7 +131,6 @@ portable_init(core_portable *p, int *argc, char *argv[])
     uint32_t rtc_freq   = CHS_REGS->rtc_freq.f.ref_freq;
     uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
     uart_init(&__uart_base_addr__, reset_freq, __BOOT_BAUDRATE);
-    ee_printf("Core frequency: %u Hz\n", (uint32_t)reset_freq);
 
     (void)argc;
     (void)argv;
@@ -149,6 +148,8 @@ portable_init(core_portable *p, int *argc, char *argv[])
     p->portable_id = 1;
 
     ee_printf("CoreMark init\n");
+    ee_printf("Core frequency: %u Hz\n", (uint32_t)reset_freq);
+    uart_write_flush(&__uart_base_addr__);
 }
 /* Function : portable_fini
         Target specific final code
@@ -159,8 +160,7 @@ portable_fini(core_portable *p)
     p->portable_id = 0;
 
     CORE_TICKS ticks = stop_time_val - start_time_val;
-    double secs = (double)ticks / CLOCKS_PER_SEC;
-    double score_per_mhz = ((double)ITERATIONS / secs) / (CLOCKS_PER_SEC / 1e6);
+    double score_per_mhz = (double)ITERATIONS * 1e6 / ticks;
     ee_printf("CoreMark/MHz     : %f\n", score_per_mhz);
     ee_printf("CoreMark finish\n");
     uart_write_flush(&__uart_base_addr__);
