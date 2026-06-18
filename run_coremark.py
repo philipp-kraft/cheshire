@@ -5,24 +5,32 @@ import re
 import subprocess
 import sys
 
-SSH_HOST   = "weissenstein"
+SSH_HOST = "weissenstein"
 FPGA_CLASS = "genesys2"
 FPGA_LEASE = "1h"
 
 _C = {
-    "reset":   "\x1b[0m",
-    "bold":    "\x1b[1m",
-    "cyan":    "\x1b[36m",
-    "green":   "\x1b[32m",
-    "yellow":  "\x1b[33m",
-    "red":     "\x1b[31m",
+    "reset": "\x1b[0m",
+    "bold": "\x1b[1m",
+    "cyan": "\x1b[36m",
+    "green": "\x1b[32m",
+    "yellow": "\x1b[33m",
+    "red": "\x1b[31m",
 }
 
 
 def log(level, msg):
-    colors = {"INFO": _C["cyan"], "OK": _C["green"], "WARN": _C["yellow"], "ERROR": _C["red"]}
+    colors = {
+        "INFO": _C["cyan"],
+        "OK": _C["green"],
+        "WARN": _C["yellow"],
+        "ERROR": _C["red"],
+    }
     c = colors.get(level, "")
-    print(f"{c}{_C['bold']}[{level}]{_C['reset']} {msg}", file=sys.stderr if level == "ERROR" else sys.stdout)
+    print(
+        f"{c}{_C['bold']}[{level}]{_C['reset']} {msg}",
+        file=sys.stderr if level == "ERROR" else sys.stdout,
+    )
 
 
 def ssh(host, cmd):
@@ -37,15 +45,21 @@ def ssh(host, cmd):
 
 
 def strip_ansi(text):
-    return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+    return re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", text)
 
 
 def release_existing(host):
     result = ssh(host, "fpga sessions")
     # Board names are non-indented non-empty lines; details are indented
     # Board names are non-indented, single tokens (no spaces, no colons)
-    boards = [line.strip() for line in strip_ansi(result.stdout).splitlines()
-              if line and not line[0].isspace() and " " not in line.strip() and ":" not in line]
+    boards = [
+        line.strip()
+        for line in strip_ansi(result.stdout).splitlines()
+        if line
+        and not line[0].isspace()
+        and " " not in line.strip()
+        and ":" not in line
+    ]
     if not boards:
         log("INFO", "No existing sessions to release")
         return
