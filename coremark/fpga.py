@@ -224,9 +224,22 @@ def start_gdb(host, openocd_port, elf):
     )
 
 
-def flash(board, tcp_port, jtag_sn):
+def synth():
+    """Build the genesys2 bitstream locally via make."""
+    log("INFO", f"Synthesising bitstream for {FPGA_CLASS} (this takes a while)...")
+    subprocess.run(
+        ["make", f"chs-xilinx-{FPGA_CLASS}"],
+        check=True,
+        cwd=_REPO_ROOT,
+        stdout=_logfile,
+        stderr=_logfile,
+    )
+    log("OK", "Synthesis complete")
+
+
+def program(board, tcp_port, jtag_sn):
     """Program the FPGA bitstream via the Xilinx hardware server using make."""
-    log("INFO", f"Flashing {board} via {SSH_HOST}:{tcp_port}")
+    log("INFO", f"Programming {board} via {SSH_HOST}:{tcp_port}")
     subprocess.run(
         [
             "make",
@@ -236,8 +249,10 @@ def flash(board, tcp_port, jtag_sn):
         ],
         check=True,
         cwd=_REPO_ROOT,
+        stdout=_logfile,
+        stderr=_logfile,
     )
-    log("OK", f"Flash complete")
+    log("OK", f"Programming complete")
 
 
 def book(host, fpga_class, lease):
@@ -284,16 +299,16 @@ def main():
     openocd_proc = None
     gdb_proc = None
     try:
+        if args.synth:
+            synth()
         release_existing(SSH_HOST)
         board = book(SSH_HOST, FPGA_CLASS, FPGA_LEASE)
         tcp_port, jtag_sn, openocd_port = start_hwserver(SSH_HOST, board)
-        if args.synth:
-            raise NotImplementedError("--synth not yet implemented")
         uart = find_uart(SSH_HOST, board)
         uart_proc, uart_log = start_uart_log(SSH_HOST, uart)
         log("INFO", f"UART output -> {uart_log}")
         if args.program:
-            flash(board, tcp_port, jtag_sn)
+            program(board, tcp_port, jtag_sn)
         openocd_proc = start_openocd(SSH_HOST, board)
         gdb_proc = start_gdb(SSH_HOST, openocd_port, args.binary)
         watch_uart(uart_log, match=args.match)
