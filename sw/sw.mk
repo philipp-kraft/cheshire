@@ -48,6 +48,32 @@ CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/base/*.c)
 CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/dif/*.c)
 CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/dif/autogen/*.c)
 
+############
+# CoreMark #
+############
+
+COREMARK_ITERATIONS     ?= 2000
+COREMARK_CLOCKS_PER_SEC ?= 50000000
+
+COREMARK_BASE_FLAGS ?= -DOT_PLATFORM_RV32 -march=rv64gc_zifencei -mabi=lp64d -mstrict-align \
+                       -static -ffunction-sections -fdata-sections \
+                       -frandom-seed=cheshire -fuse-linker-plugin -flto -Wl,-flto \
+                       -mcmodel=medany -mexplicit-relocs -fno-builtin \
+                       -O3 \
+                       -fno-tree-loop-distribute-patterns \
+                       -funroll-all-loops \
+                       -falign-jumps=4
+
+COREMARK_SW_FLAGS ?= $(COREMARK_BASE_FLAGS)
+
+COREMARK_SW_FLAGS += -DITERATIONS=$(COREMARK_ITERATIONS) \
+                     -DCLOCKS_PER_SEC=$(COREMARK_CLOCKS_PER_SEC) \
+                     -DFLAGS_STR='"$(COREMARK_BASE_FLAGS)"'
+
+CHS_SW_DEPS_INCS += -I$(CHS_SW_DIR)/deps/coremark
+CHS_SW_DEPS_INCS += -I$(CHS_SW_DIR)/include/coremark
+CHS_SW_DEPS_SRCS += $(filter-out %/core_main.c,$(wildcard $(CHS_SW_DIR)/deps/coremark/*.c))
+
 #############
 # Libraries #
 #############
@@ -112,6 +138,19 @@ $(CHS_SW_ADDRS_LDH): $(CHS_ROOT)/hw/cheshire.rdl $(CHS_SLINK_DIR)/.generated
 
 %.o: %.S $(CHS_SW_GEN_HDRS)
 	$(CHS_SW_CC) $(CHS_SW_INCLUDES) $(CHS_SW_CCFLAGS) -c $< -o $@
+
+# CoreMark sources get own flags
+$(CHS_SW_DIR)/deps/coremark/%.o: $(CHS_SW_DIR)/deps/coremark/%.c $(CHS_SW_GEN_HDRS)
+	$(CHS_SW_CC) $(CHS_SW_INCLUDES) $(COREMARK_SW_FLAGS) -c $< -o $@
+
+$(CHS_SW_DIR)/lib/coremark/%.o: $(CHS_SW_DIR)/lib/coremark/%.c $(CHS_SW_GEN_HDRS)
+	$(CHS_SW_CC) $(CHS_SW_INCLUDES) $(COREMARK_SW_FLAGS) -c $< -o $@
+
+$(CHS_SW_DIR)/tests/coremark.o: $(CHS_SW_DIR)/tests/coremark.c $(CHS_SW_GEN_HDRS)
+	$(CHS_SW_CC) $(CHS_SW_INCLUDES) $(COREMARK_SW_FLAGS) -c $< -o $@
+
+$(CHS_SW_DIR)/tests/coremark.%.o: $(CHS_SW_DIR)/tests/coremark.c $(CHS_SW_GEN_HDRS)
+	$(CHS_SW_CC) $(CHS_SW_INCLUDES) $(COREMARK_SW_FLAGS) -c $< -o $@
 
 # Programs may specify a linking mode in their name, e.g. `helloworld.spm.c`.
 # Tests with such infixes are built only for one linking mode, tests without them for all
@@ -207,3 +246,8 @@ CHS_SW_TESTS += $(CHS_SW_TEST_ROM_DUMP:.rom.dump=.rom.memh) $(CHS_SW_TEST_ROM_DU
 
 # Add all dumps to test build
 CHS_SW_TESTS += $(CHS_SW_TEST_DUMP)
+
+.PHONY: sw-clean
+sw-clean:
+	rm -f $(CHS_SW_LIB_SRCS_O) $(CHS_SW_LIBS) $(CHS_SW_TESTS) $(CHS_SW_TOOLS)
+	rm -f $(wildcard $(CHS_SW_DIR)/tests/*.o $(CHS_SW_DIR)/tests/*.elf)
