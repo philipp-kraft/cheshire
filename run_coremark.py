@@ -9,6 +9,7 @@ import sys
 SSH_HOST  = "weissenstein"
 FPGA_CLASS = "genesys2"
 FPGA_LEASE = "1h"
+BAUD      = 115200
 LOG_DIR   = "logs"
 
 _C = {
@@ -102,6 +103,34 @@ def start_hwserver(host, board):
     return tcp_port, jtag_sn
 
 
+def find_uart(host, board):
+    result = ssh(host, "fpga sessions")
+    lines = strip_ansi(result.stdout).splitlines()
+    in_our_board = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == board:
+            in_our_board = True
+        elif in_our_board and stripped.startswith("/dev/ttyUSB"):
+            log("OK", f"UART: {stripped}")
+            return stripped
+    raise RuntimeError(f"No UART found for {board} in fpga sessions")
+
+
+def start_uart_log(host, uart):
+    import os
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(LOG_DIR, f"uart_{ts}.log")
+    uart_file = open(path, "w")
+    proc = subprocess.Popen(
+        ["ssh", "-o", "LogLevel=QUIET", host,
+         f"stty -F {uart} {BAUD} raw -echo; cat {uart}"],
+        stdout=uart_file, stderr=subprocess.DEVNULL,
+    )
+    log("OK", f"UART log started: {path}")
+    return proc, path
+
+
 def flash(board, tcp_port, jtag_sn):
     log("INFO", f"Flashing {board} via {SSH_HOST}:{tcp_port}")
     subprocess.run(
@@ -133,16 +162,22 @@ def release(host, board):
 def main():
     _open_log()
     board = None
+    uart_proc = None
     try:
         release_existing(SSH_HOST)
         board = book(SSH_HOST, FPGA_CLASS, FPGA_LEASE)
         tcp_port, jtag_sn = start_hwserver(SSH_HOST, board)
+        uart = find_uart(SSH_HOST, board)
+        uart_proc, uart_log = start_uart_log(SSH_HOST, uart)
+        log("INFO", f"UART output -> {uart_log}")
         flash(board, tcp_port, jtag_sn)
 
     except Exception as e:
         log("ERROR", str(e))
         sys.exit(1)
     finally:
+        if uart_proc:
+            uart_proc.terminate()
         if board:
             release(SSH_HOST, board)
 
