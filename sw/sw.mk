@@ -52,8 +52,8 @@ CHS_SW_DEPS_SRCS += $(wildcard $(OTPROOT)/sw/device/lib/dif/autogen/*.c)
 # CoreMark #
 ############
 
-COREMARK_ITERATIONS     ?= 5000
-COREMARK_CLOCKS_PER_SEC ?= 200000000
+COREMARK_ITERATIONS     ?= 2000
+COREMARK_CLOCKS_PER_SEC ?= 50000000
 
 COREMARK_OPT_FLAGS ?= -O3 \
                       -fno-tree-loop-distribute-patterns \
