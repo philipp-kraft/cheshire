@@ -9,7 +9,6 @@ SSH_HOST   = "weissenstein"
 FPGA_CLASS = "genesys2"
 FPGA_LEASE = "1h"
 
-# ANSI colors
 _C = {
     "reset":   "\x1b[0m",
     "bold":    "\x1b[1m",
@@ -41,6 +40,21 @@ def strip_ansi(text):
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
 
 
+def release_existing(host):
+    result = ssh(host, "fpga sessions")
+    # Board names are non-indented non-empty lines; details are indented
+    # Board names are non-indented, single tokens (no spaces, no colons)
+    boards = [line.strip() for line in strip_ansi(result.stdout).splitlines()
+              if line and not line[0].isspace() and " " not in line.strip() and ":" not in line]
+    if not boards:
+        log("INFO", "No existing sessions to release")
+        return
+    for board in boards:
+        board = board.strip()
+        log("WARN", f"Releasing existing session: {board}")
+        release(host, board)
+
+
 def book(host, fpga_class, lease):
     result = ssh(host, f"fpga book --class {fpga_class} --time {lease}")
     board = strip_ansi(result.stdout).strip().split()[2]
@@ -49,13 +63,17 @@ def book(host, fpga_class, lease):
 
 
 def release(host, board):
-    ssh(host, f"fpga release -b {board}")
-    log("OK", f"Released {board}")
+    try:
+        ssh(host, f"fpga release -b {board}")
+        log("OK", f"Released {board}")
+    except subprocess.CalledProcessError as e:
+        log("WARN", f"Release failed for {board}: {e.stderr.strip()}")
 
 
 def main():
     board = None
     try:
+        release_existing(SSH_HOST)
         board = book(SSH_HOST, FPGA_CLASS, FPGA_LEASE)
 
     except Exception as e:
