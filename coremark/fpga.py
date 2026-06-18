@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CoreMark FPGA automation"""
+"""FPGA run automation — book board, optionally program bitstream, load ELF via GDB, capture UART."""
 
 import argparse
 import datetime
@@ -9,42 +9,43 @@ import subprocess
 import sys
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT  = os.path.dirname(_SCRIPT_DIR)
+_REPO_ROOT = os.path.dirname(_SCRIPT_DIR)
 
-SSH_HOST      = "weissenstein"
-FPGA_CLASS    = "genesys2"
-FPGA_LEASE    = "1h"
-BAUD          = 115200
-LOG_DIR       = os.path.join(_SCRIPT_DIR, "logs")
-COREMARK_ELF  = os.path.join(_REPO_ROOT, "sw/tests/coremark.spm.elf")
-OPENOCD_TCL   = "cheshire-target.tcl"
+SSH_HOST = "weissenstein"
+FPGA_CLASS = "genesys2"
+FPGA_LEASE = "1h"
+BAUD = 115200
+LOG_DIR = os.path.join(_SCRIPT_DIR, "logs")
+COREMARK_ELF = os.path.join(_REPO_ROOT, "sw/tests/coremark.spm.elf")
+OPENOCD_TCL = "cheshire-target.tcl"
 
 _C = {
-    "reset":  "\x1b[0m",
-    "bold":   "\x1b[1m",
-    "cyan":   "\x1b[36m",
-    "green":  "\x1b[32m",
+    "reset": "\x1b[0m",
+    "bold": "\x1b[1m",
+    "cyan": "\x1b[36m",
+    "green": "\x1b[32m",
     "yellow": "\x1b[33m",
-    "red":    "\x1b[31m",
+    "red": "\x1b[31m",
 }
 
 _logfile = None
+_run_ts = None
 
 
 def _open_log():
-    global _logfile
+    global _logfile, _run_ts
     os.makedirs(LOG_DIR, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(LOG_DIR, f"coremark_{ts}.log")
+    _run_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(LOG_DIR, f"{_run_ts}_fpga.log")
     _logfile = open(log_path, "w")
     log("INFO", f"Log opened: {log_path}")
 
 
 def log(level, msg):
     colors = {
-        "INFO":  _C["cyan"],
-        "OK":    _C["green"],
-        "WARN":  _C["yellow"],
+        "INFO": _C["cyan"],
+        "OK": _C["green"],
+        "WARN": _C["yellow"],
         "ERROR": _C["red"],
     }
     c = colors.get(level, "")
@@ -74,6 +75,7 @@ def strip_ansi(text):
 
 
 def release_existing(host):
+    """Release any FPGA sessions already held by this user before booking a new one."""
     result = ssh(host, "fpga sessions")
     boards = [
         line.strip()
@@ -93,11 +95,19 @@ def release_existing(host):
 
 
 def start_hwserver(host, board):
+    """Start the Xilinx hardware server for the board and return (tcp_port, jtag_sn, openocd_port)."""
     log("INFO", f"Starting hardware server for {board}")
     result = subprocess.run(
-        ["ssh", "-tt", "-o", "LogLevel=QUIET", host,
-         f"source /etc/profile; fpga run -b {board}"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        [
+            "ssh",
+            "-tt",
+            "-o",
+            "LogLevel=QUIET",
+            host,
+            f"source /etc/profile; fpga run -b {board}",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         universal_newlines=True,
     )
     # Lines 2-5 (1-indexed): strip ANSI, split on ':', take 3rd field
@@ -105,11 +115,15 @@ def start_hwserver(host, board):
     params = [line.split(":")[2].strip() for line in lines]
     # params[0]=TCP port, params[1]=Vivado GDB, params[2]=JTAG serial, params[3]=OpenOCD GDB
     tcp_port, jtag_sn, openocd_port = params[0], params[2], params[3]
-    log("OK", f"Hardware server: port={tcp_port}  jtag={jtag_sn}  openocd={openocd_port}")
+    log(
+        "OK",
+        f"Hardware server: port={tcp_port}  jtag={jtag_sn}  openocd={openocd_port}",
+    )
     return tcp_port, jtag_sn, openocd_port
 
 
 def find_uart(host, board):
+    """Find the /dev/ttyUSB* path assigned to the booked board in fpga sessions output."""
     result = ssh(host, "fpga sessions")
     lines = strip_ansi(result.stdout).splitlines()
     in_our_board = False
@@ -124,25 +138,34 @@ def find_uart(host, board):
 
 
 def start_uart_log(host, uart):
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = os.path.join(LOG_DIR, f"uart_{ts}.log")
+    """Open a background ssh+cat process that streams UART output into a timestamped log file."""
+    path = os.path.join(LOG_DIR, f"{_run_ts}_uart.log")
     # Kill any stale process still holding the device from a previous run
     subprocess.run(
         ["ssh", "-o", "LogLevel=QUIET", host, f"fuser -k {uart} 2>/dev/null; true"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     uart_file = open(path, "w")
     proc = subprocess.Popen(
-        ["ssh", "-o", "LogLevel=QUIET", host,
-         f"stty -F {uart} {BAUD} raw -echo && cat {uart}"],
-        stdout=uart_file, stderr=uart_file,  # log stty/cat errors into the uart log
+        [
+            "ssh",
+            "-o",
+            "LogLevel=QUIET",
+            host,
+            f"stty -F {uart} {BAUD} raw -echo && cat {uart}",
+        ],
+        stdout=uart_file,
+        stderr=uart_file,  # log stty/cat errors into the uart log
     )
     log("OK", f"UART log started: {path}")
     return proc, path
 
 
 def watch_uart(uart_log, match="CoreMark finish", timeout=300):
+    """Tail the UART log file and block until match appears or timeout (seconds) is reached."""
     import time
+
     log("INFO", f"Waiting for '{match}' (timeout {timeout}s)...")
     deadline = time.time() + timeout
     with open(uart_log, "r") as f:
@@ -158,41 +181,56 @@ def watch_uart(uart_log, match="CoreMark finish", timeout=300):
 
 
 def start_openocd(host, board):
-    """Start OpenOCD on the remote host in the background. Returns Popen handle."""
+    """Launch OpenOCD on the remote host in the background using the user-board config."""
     import getpass
+
     user = getpass.getuser()
     openocd_cfg = f"{user}-{board}-openocd.tcl"
     log("INFO", f"Starting OpenOCD: {openocd_cfg} + {OPENOCD_TCL}")
     proc = subprocess.Popen(
-        ["ssh", "-o", "LogLevel=QUIET", host,
-         f"openocd -f {openocd_cfg} -f {OPENOCD_TCL}"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            "ssh",
+            "-o",
+            "LogLevel=QUIET",
+            host,
+            f"openocd -f {openocd_cfg} -f {OPENOCD_TCL}",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return proc
 
 
 def start_gdb(host, openocd_port, elf):
-    """Load ELF and continue in the background. Returns Popen handle."""
+    """Connect GDB to OpenOCD, load the ELF, and continue execution in the background."""
     import time
+
     time.sleep(2)  # give OpenOCD time to start
     log("INFO", f"GDB: load + continue via {host}:{openocd_port}")
     return subprocess.Popen(
         [
-            "riscv64-unknown-elf-gdb", "-batch",
-            "-ex", f"target extended-remote {host}:{openocd_port}",
-            "-ex", "load",
-            "-ex", "continue",
+            "riscv64-unknown-elf-gdb",
+            "-batch",
+            "-ex",
+            f"target extended-remote {host}:{openocd_port}",
+            "-ex",
+            "load",
+            "-ex",
+            "continue",
             elf,
         ],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
 
 def flash(board, tcp_port, jtag_sn):
+    """Program the FPGA bitstream via the Xilinx hardware server using make."""
     log("INFO", f"Flashing {board} via {SSH_HOST}:{tcp_port}")
     subprocess.run(
         [
-            "make", f"chs-xilinx-program-{FPGA_CLASS}",
+            "make",
+            f"chs-xilinx-program-{FPGA_CLASS}",
             f"CHS_XILINX_HWS_URL={SSH_HOST}:{tcp_port}",
             f"CHS_XILINX_HWS_PATH_{FPGA_CLASS}={{xilinx_tcf/*/{jtag_sn}*}}",
         ],
@@ -218,13 +256,26 @@ def release(host, board):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CoreMark FPGA automation")
-    parser.add_argument("--synth", action="store_true",
-                        help="Generate bitstream before flashing")
-    parser.add_argument("--program", action="store_true",
-                        help="Program the FPGA bitstream")
-    parser.add_argument("--binary", default=COREMARK_ELF, metavar="ELF",
-                        help=f"ELF to load via GDB (default: {COREMARK_ELF})")
+    """Book an FPGA, optionally program it, load an ELF, and wait for UART output."""
+    parser = argparse.ArgumentParser(description="FPGA run automation")
+    parser.add_argument(
+        "--synth", action="store_true", help="Generate bitstream before flashing"
+    )
+    parser.add_argument(
+        "--program", action="store_true", help="Program the FPGA bitstream"
+    )
+    parser.add_argument(
+        "--binary",
+        default=COREMARK_ELF,
+        metavar="ELF",
+        help=f"ELF to load via GDB (default: {COREMARK_ELF})",
+    )
+    parser.add_argument(
+        "--match",
+        default="CoreMark finish",
+        metavar="STRING",
+        help="String to wait for in UART output (default: 'CoreMark finish')",
+    )
     args = parser.parse_args()
 
     _open_log()
@@ -245,7 +296,7 @@ def main():
             flash(board, tcp_port, jtag_sn)
         openocd_proc = start_openocd(SSH_HOST, board)
         gdb_proc = start_gdb(SSH_HOST, openocd_port, args.binary)
-        watch_uart(uart_log)
+        watch_uart(uart_log, match=args.match)
 
     except Exception as e:
         log("ERROR", str(e))
