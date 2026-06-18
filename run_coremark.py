@@ -1,36 +1,54 @@
 #!/usr/bin/env python3
 """CoreMark FPGA automation"""
 
+import datetime
 import re
 import subprocess
 import sys
 
-SSH_HOST = "weissenstein"
+SSH_HOST  = "weissenstein"
 FPGA_CLASS = "genesys2"
 FPGA_LEASE = "1h"
+LOG_DIR   = "logs"
 
 _C = {
-    "reset": "\x1b[0m",
-    "bold": "\x1b[1m",
-    "cyan": "\x1b[36m",
-    "green": "\x1b[32m",
+    "reset":  "\x1b[0m",
+    "bold":   "\x1b[1m",
+    "cyan":   "\x1b[36m",
+    "green":  "\x1b[32m",
     "yellow": "\x1b[33m",
-    "red": "\x1b[31m",
+    "red":    "\x1b[31m",
 }
+
+_logfile = None
+
+
+def _open_log():
+    global _logfile
+    import os
+    os.makedirs(LOG_DIR, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(LOG_DIR, f"coremark_{ts}.log")
+    _logfile = open(log_path, "w")
+    log("INFO", f"Log opened: {log_path}")
 
 
 def log(level, msg):
     colors = {
-        "INFO": _C["cyan"],
-        "OK": _C["green"],
-        "WARN": _C["yellow"],
+        "INFO":  _C["cyan"],
+        "OK":    _C["green"],
+        "WARN":  _C["yellow"],
         "ERROR": _C["red"],
     }
     c = colors.get(level, "")
+    ts = datetime.datetime.now().strftime("%H:%M:%S")
     print(
         f"{c}{_C['bold']}[{level}]{_C['reset']} {msg}",
         file=sys.stderr if level == "ERROR" else sys.stdout,
     )
+    if _logfile:
+        _logfile.write(f"{ts} [{level}] {msg}\n")
+        _logfile.flush()
 
 
 def ssh(host, cmd):
@@ -113,6 +131,7 @@ def release(host, board):
 
 
 def main():
+    _open_log()
     board = None
     try:
         release_existing(SSH_HOST)
