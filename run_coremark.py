@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CoreMark FPGA automation"""
 
+import argparse
 import datetime
 import re
 import subprocess
@@ -168,7 +169,7 @@ def start_openocd(host, board):
     return proc
 
 
-def start_gdb(host, openocd_port):
+def start_gdb(host, openocd_port, elf):
     """Load ELF and continue in the background. Returns Popen handle."""
     import time
     time.sleep(2)  # give OpenOCD time to start
@@ -179,7 +180,7 @@ def start_gdb(host, openocd_port):
             "-ex", f"target extended-remote {host}:{openocd_port}",
             "-ex", "load",
             "-ex", "continue",
-            COREMARK_ELF,
+            elf,
         ],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
@@ -214,6 +215,15 @@ def release(host, board):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="CoreMark FPGA automation")
+    parser.add_argument("--synth", action="store_true",
+                        help="Generate bitstream before flashing")
+    parser.add_argument("--program", action="store_true",
+                        help="Program the FPGA bitstream")
+    parser.add_argument("--binary", default=COREMARK_ELF, metavar="ELF",
+                        help=f"ELF to load via GDB (default: {COREMARK_ELF})")
+    args = parser.parse_args()
+
     _open_log()
     board = None
     uart_proc = None
@@ -223,12 +233,15 @@ def main():
         release_existing(SSH_HOST)
         board = book(SSH_HOST, FPGA_CLASS, FPGA_LEASE)
         tcp_port, jtag_sn, openocd_port = start_hwserver(SSH_HOST, board)
+        if args.synth:
+            raise NotImplementedError("--synth not yet implemented")
         uart = find_uart(SSH_HOST, board)
         uart_proc, uart_log = start_uart_log(SSH_HOST, uart)
         log("INFO", f"UART output -> {uart_log}")
-        flash(board, tcp_port, jtag_sn)
+        if args.program:
+            flash(board, tcp_port, jtag_sn)
         openocd_proc = start_openocd(SSH_HOST, board)
-        gdb_proc = start_gdb(SSH_HOST, openocd_port)
+        gdb_proc = start_gdb(SSH_HOST, openocd_port, args.binary)
         watch_uart(uart_log)
 
     except Exception as e:
