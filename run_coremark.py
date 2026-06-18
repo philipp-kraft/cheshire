@@ -50,8 +50,6 @@ def strip_ansi(text):
 
 def release_existing(host):
     result = ssh(host, "fpga sessions")
-    # Board names are non-indented non-empty lines; details are indented
-    # Board names are non-indented, single tokens (no spaces, no colons)
     boards = [
         line.strip()
         for line in strip_ansi(result.stdout).splitlines()
@@ -67,6 +65,36 @@ def release_existing(host):
         board = board.strip()
         log("WARN", f"Releasing existing session: {board}")
         release(host, board)
+
+
+def start_hwserver(host, board):
+    log("INFO", f"Starting hardware server for {board}")
+    result = subprocess.run(
+        ["ssh", "-tt", "-o", "LogLevel=QUIET", host,
+         f"source /etc/profile; fpga run -b {board}"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+    # Lines 2-5 (1-indexed): strip ANSI, split on ':', take 3rd field
+    lines = strip_ansi(result.stdout).splitlines()[1:5]
+    params = [line.split(":")[2].strip() for line in lines]
+    # params[0]=TCP port, params[1]=Vivado GDB, params[2]=JTAG serial, params[3]=OpenOCD
+    tcp_port, jtag_sn = params[0], params[2]
+    log("OK", f"Hardware server: port={tcp_port}  jtag={jtag_sn}")
+    return tcp_port, jtag_sn
+
+
+def flash(board, tcp_port, jtag_sn):
+    log("INFO", f"Flashing {board} via {SSH_HOST}:{tcp_port}")
+    subprocess.run(
+        [
+            "make", f"chs-xilinx-program-{FPGA_CLASS}",
+            f"CHS_XILINX_HWS_URL={SSH_HOST}:{tcp_port}",
+            f"CHS_XILINX_HWS_PATH_{FPGA_CLASS}={{xilinx_tcf/*/{jtag_sn}*}}",
+        ],
+        check=True,
+    )
+    log("OK", f"Flash complete")
 
 
 def book(host, fpga_class, lease):
@@ -89,6 +117,8 @@ def main():
     try:
         release_existing(SSH_HOST)
         board = book(SSH_HOST, FPGA_CLASS, FPGA_LEASE)
+        tcp_port, jtag_sn = start_hwserver(SSH_HOST, board)
+        flash(board, tcp_port, jtag_sn)
 
     except Exception as e:
         log("ERROR", str(e))
