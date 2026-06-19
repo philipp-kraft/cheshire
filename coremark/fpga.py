@@ -17,6 +17,7 @@ FPGA_LEASE = "1h"
 BAUD = 115200
 LOG_DIR = os.path.join(_SCRIPT_DIR, "logs")
 COREMARK_ELF = os.path.join(_REPO_ROOT, "sw/tests/coremark.spm.elf")
+COREMARK_GPT = os.path.join(_REPO_ROOT, "sw/tests/coremark.gpt.bin")
 OPENOCD_TCL = "cheshire-target.tcl"
 
 _C = {
@@ -29,16 +30,17 @@ _C = {
 }
 
 _logfile = None
-_run_ts = None
+_run_dir = None
 
 
 def _open_log():
-    global _logfile, _run_ts
-    os.makedirs(LOG_DIR, exist_ok=True)
-    _run_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(LOG_DIR, f"{_run_ts}_fpga.log")
+    global _logfile, _run_dir
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    _run_dir = os.path.join(LOG_DIR, ts)
+    os.makedirs(_run_dir, exist_ok=True)
+    log_path = os.path.join(_run_dir, "fpga.log")
     _logfile = open(log_path, "w")
-    log("INFO", f"Log opened: {log_path}")
+    log("INFO", f"Run dir: {_run_dir}")
 
 
 def log(level, msg):
@@ -139,7 +141,7 @@ def find_uart(host, board):
 
 def start_uart_log(host, uart):
     """Open a background ssh+cat process that streams UART output into a timestamped log file."""
-    path = os.path.join(LOG_DIR, f"{_run_ts}_uart.log")
+    path = os.path.join(_run_dir, "uart.log")
     # Kill any stale process still holding the device from a previous run
     subprocess.run(
         ["ssh", "-o", "LogLevel=QUIET", host, f"fuser -k {uart} 2>/dev/null; true"],
@@ -186,7 +188,9 @@ def start_openocd(host, board):
 
     user = getpass.getuser()
     openocd_cfg = f"{user}-{board}-openocd.tcl"
-    log("INFO", f"Starting OpenOCD: {openocd_cfg} + {OPENOCD_TCL}")
+    path = os.path.join(_run_dir, "openocd.log")
+    log("INFO", f"Starting OpenOCD: {openocd_cfg} + {OPENOCD_TCL}  -> {path}")
+    openocd_file = open(path, "w")
     proc = subprocess.Popen(
         [
             "ssh",
@@ -195,32 +199,28 @@ def start_openocd(host, board):
             host,
             f"openocd -f {openocd_cfg} -f {OPENOCD_TCL}",
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=openocd_file,
+        stderr=openocd_file,
     )
     return proc
 
 
 def start_gdb(host, openocd_port, elf):
-    """Connect GDB to OpenOCD, load the ELF, and continue execution in the background."""
-    import time
-
-    time.sleep(2)  # give OpenOCD time to start
-    log("INFO", f"GDB: load + continue via {host}:{openocd_port}")
+    """Connect GDB to OpenOCD, reset+halt the CPU, load the ELF, and continue."""
+    path = os.path.join(_run_dir, "gdb.log")
+    log("INFO", f"GDB: reset + load + continue via {host}:{openocd_port}  -> {path}")
+    gdb_file = open(path, "w")
     return subprocess.Popen(
         [
-            "riscv64-unknown-elf-gdb",
-            "-batch",
-            "-ex",
-            f"target extended-remote {host}:{openocd_port}",
-            "-ex",
-            "load",
-            "-ex",
-            "continue",
+            "riscv64-unknown-elf-gdb", "-batch",
+            "-ex", f"target extended-remote {host}:{openocd_port}",
+            "-ex", "monitor reset halt",
+            "-ex", "load",
+            "-ex", "continue",
             elf,
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=gdb_file,
+        stderr=gdb_file,
     )
 
 
@@ -255,6 +255,25 @@ def program(board, tcp_port, jtag_sn):
     log("OK", f"Programming complete")
 
 
+def flash(board, tcp_port, jtag_sn, img):
+    """Flash a GPT disk image to the board's onboard SPI flash via the Xilinx hardware server."""
+    log("INFO", f"Flashing {img} to {board} via {SSH_HOST}:{tcp_port} (this takes ~10 min)")
+    subprocess.run(
+        [
+            "make",
+            f"chs-xilinx-flash-{FPGA_CLASS}",
+            f"CHS_XILINX_FLASH_IMG={img}",
+            f"CHS_XILINX_HWS_URL={SSH_HOST}:{tcp_port}",
+            f"CHS_XILINX_HWS_PATH_{FPGA_CLASS}={{xilinx_tcf/*/{jtag_sn}*}}",
+        ],
+        check=True,
+        cwd=_REPO_ROOT,
+        stdout=_logfile,
+        stderr=_logfile,
+    )
+    log("OK", "Flashing complete — reprogram the bitstream before running")
+
+
 def book(host, fpga_class, lease):
     result = ssh(host, f"fpga book --class {fpga_class} --time {lease}")
     board = strip_ansi(result.stdout).strip().split()[2]
@@ -278,6 +297,14 @@ def main():
     )
     parser.add_argument(
         "--program", action="store_true", help="Program the FPGA bitstream"
+    )
+    parser.add_argument(
+        "--flash",
+        nargs="?",
+        const=COREMARK_GPT,
+        default=None,
+        metavar="IMG",
+        help=f"Flash a GPT disk image to onboard SPI flash (default: {COREMARK_GPT})",
     )
     parser.add_argument(
         "--binary",
@@ -307,10 +334,14 @@ def main():
         uart = find_uart(SSH_HOST, board)
         uart_proc, uart_log = start_uart_log(SSH_HOST, uart)
         log("INFO", f"UART output -> {uart_log}")
+        if args.flash:
+            flash(board, tcp_port, jtag_sn, args.flash)
         if args.program:
             program(board, tcp_port, jtag_sn)
-        openocd_proc = start_openocd(SSH_HOST, board)
-        gdb_proc = start_gdb(SSH_HOST, openocd_port, args.binary)
+        if not args.program:
+            openocd_proc = start_openocd(SSH_HOST, board)
+            gdb_proc = start_gdb(SSH_HOST, openocd_port, args.binary)
+        
         watch_uart(uart_log, match=args.match)
 
     except Exception as e:
