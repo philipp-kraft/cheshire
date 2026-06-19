@@ -262,7 +262,7 @@ def flash(board, tcp_port, jtag_sn, img):
         [
             "make",
             f"chs-xilinx-flash-{FPGA_CLASS}",
-            f"CHS_XILINX_FLASH_IMG={img}",
+            f"CHS_XILINX_FLASH_IMG={os.path.abspath(img)}",
             f"CHS_XILINX_HWS_URL={SSH_HOST}:{tcp_port}",
             f"CHS_XILINX_HWS_PATH_{FPGA_CLASS}={{xilinx_tcf/*/{jtag_sn}*}}",
         ],
