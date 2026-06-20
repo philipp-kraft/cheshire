@@ -71,6 +71,14 @@ package cheshire_pkg;
     shrt_bt Cva6BTBEntries;
     shrt_bt Cva6BHTEntries;
     shrt_bt Cva6NrPMPEntries;
+    // LSU pipeline depth and buffer sizing
+    shrt_bt Cva6NrLoadPipeRegs;
+    shrt_bt Cva6NrStorePipeRegs;
+    shrt_bt Cva6NrLoadBufEntries;
+    shrt_bt Cva6MaxOutstandingStores;
+    // ISA extensions
+    bit     Cva6RVC;
+    bit     Cva6RVB;
     // To reduce parameterization entropy, the range [0x2.., 0x8..) is defined to contain exactly
     // one cached, idempotent, and executable (CIE) and one non-CIE region. The parameters below
     // control the CIE region's size and whether it abuts with the top or bottom of this range.
@@ -519,6 +527,12 @@ package cheshire_pkg;
     ret.BTBEntries            = cfg.Cva6BTBEntries;
     ret.BHTEntries            = cfg.Cva6BHTEntries;
     ret.NrPMPEntries          = cfg.Cva6NrPMPEntries;
+    ret.NrLoadPipeRegs        = cfg.Cva6NrLoadPipeRegs;
+    ret.NrStorePipeRegs       = cfg.Cva6NrStorePipeRegs;
+    ret.NrLoadBufEntries      = cfg.Cva6NrLoadBufEntries;
+    ret.MaxOutstandingStores  = cfg.Cva6MaxOutstandingStores;
+    ret.RVC                   = cfg.Cva6RVC;
+    ret.RVB                   = cfg.Cva6RVB;
     // Return modified config
     return ret;
   endfunction
@@ -537,7 +551,13 @@ package cheshire_pkg;
     Cva6RASDepth      : 2,
     Cva6BTBEntries    : 32,
     Cva6BHTEntries    : 128,
-    Cva6NrPMPEntries  : 0,
+    Cva6NrPMPEntries         : 0,
+    Cva6NrLoadPipeRegs       : 1,
+    Cva6NrStorePipeRegs      : 0,
+    Cva6NrLoadBufEntries     : 2,
+    Cva6MaxOutstandingStores : 7,
+    Cva6RVC                  : 1,
+    Cva6RVB                  : 0,
     Cva6ExtCieLength  : 'h2000_0000,  // [0x2.., 0x4..) is CIE, [0x4.., 0x8..) is non-CIE
     Cva6ExtCieOnTop   : 0,
     // Harts
