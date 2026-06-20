@@ -321,6 +321,8 @@ def main():
     args = parser.parse_args()
 
     _open_log()
+    if args.flash and not args.program:
+        log("WARN", "--flash without --program: bitstream will be lost after flashing; run with --program afterwards to restore it")
     board = None
     uart_proc = None
     openocd_proc = None
