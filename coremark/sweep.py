@@ -2,12 +2,11 @@
 """CoreMark parameter sweep: patch cheshire_pkg.sv, synth, run, collect score.
 
 Usage:
-    sweep.py                         # run all pending sweep points
-    sweep.py --dry-run               # print plan and exit
+    sweep.py                         # run all pending (not yet scored) sweep points
+    sweep.py --dry-run               # print plan (shows saved/synth per point) and exit
+    sweep.py --rerun                 # re-run all points; reuse saved bitstreams, synth the rest
     sweep.py --only baseline         # run a single point
-    sweep.py --from lsu_pipe_0_0     # resume from a specific point
-    sweep.py --no-synth              # skip synthesis (reuse last bitstream)
-    sweep.py --bitstream ras_8       # restore saved bitstream before programming
+    sweep.py --from lsu_pipe_0_0     # resume from a specific point (skip earlier ones)
 """
 
 import contextlib
@@ -26,7 +25,7 @@ sys.path.insert(0, _SCRIPT_DIR)
 import fpga as _fpga
 
 CHESHIRE_PKG = os.path.join(_REPO_ROOT, "hw", "cheshire_pkg.sv")
-RESULTS_CSV = os.path.join(_SCRIPT_DIR, "sweep_results.csv")
+RESULTS_CSV = os.path.join(_SCRIPT_DIR, "results", "sweep_results.csv")
 BITSTREAM_DIR = os.path.join(_SCRIPT_DIR, "bitstreams")
 BITSTREAM_DEFAULT = os.path.join(
     _REPO_ROOT, "target", "xilinx", "out", f"cheshire.{_fpga.FPGA_CLASS}.bit"
@@ -43,6 +42,17 @@ DEFAULTS = {
     "Cva6MaxOutstandingStores": 7,
     "Cva6RVC": 1,
     "Cva6RVB": 0,
+    "Cva6FpgaEn": 0,
+    "Cva6NrScoreboardEntries": 8,
+    "Cva6BHTHistory": 3,
+    "Cva6IcacheByteSize": 16384,
+    "Cva6IcacheSetAssoc": 4,
+    "Cva6IcacheLineWidth": 128,
+    "Cva6DcacheByteSize": 32768,
+    "Cva6DcacheSetAssoc": 8,
+    "Cva6DcacheLineWidth": 128,
+    "Cva6InstrTlbEntries": 16,
+    "Cva6DataTlbEntries": 16,
 }
 
 # Sweep table: (run_name, {param: override_value, ...})
@@ -50,35 +60,59 @@ DEFAULTS = {
 SWEEPS = [
     # Baseline
     ("baseline", {}),
-    # Branch predictor
-    ("ras_1", {"Cva6RASDepth": 1}),
+    # RAS depth (default 2)
     ("ras_4", {"Cva6RASDepth": 4}),
     ("ras_8", {"Cva6RASDepth": 8}),
+    ("ras_16", {"Cva6RASDepth": 16}),
+    # BTB entries (default 32)
     ("btb_0", {"Cva6BTBEntries": 0}),
+    ("btb_8", {"Cva6BTBEntries": 8}),
     ("btb_16", {"Cva6BTBEntries": 16}),
     ("btb_64", {"Cva6BTBEntries": 64}),
     ("btb_128", {"Cva6BTBEntries": 128}),
+    ("btb_256", {"Cva6BTBEntries": 256}),
+    # BHT entries (default 128)
     ("bht_32", {"Cva6BHTEntries": 32}),
+    ("bht_64", {"Cva6BHTEntries": 64}),
     ("bht_256", {"Cva6BHTEntries": 256}),
-    # Compressed ISA
-    ("no_rvc", {"Cva6RVC": 0}),
-    # LSU pipelining
+    ("bht_512", {"Cva6BHTEntries": 512}),
+    # BHT history bits (default 3)
+    ("bht_hist_1", {"Cva6BHTHistory": 1}),
+    ("bht_hist_2", {"Cva6BHTHistory": 2}),
+    ("bht_hist_4", {"Cva6BHTHistory": 4}),
+    ("bht_hist_5", {"Cva6BHTHistory": 5}),
+    ("bht_hist_7", {"Cva6BHTHistory": 7}),
+    # LSU pipelining (default load=1, store=0)
     ("lsu_pipe_0_0", {"Cva6NrLoadPipeRegs": 0, "Cva6NrStorePipeRegs": 0}),
     ("lsu_pipe_2_1", {"Cva6NrLoadPipeRegs": 2, "Cva6NrStorePipeRegs": 1}),
+    ("store_pipe_1", {"Cva6NrStorePipeRegs": 1}),
+    ("store_pipe_2", {"Cva6NrStorePipeRegs": 2}),
     # LSU buffer sizing
-    ("lsu_buf_1_4", {"Cva6NrLoadBufEntries": 1, "Cva6MaxOutstandingStores": 4}),
     ("lsu_buf_8_12", {"Cva6NrLoadBufEntries": 8, "Cva6MaxOutstandingStores": 12}),
     # Bitmanip
     ("rvb", {"Cva6RVB": 1}),
-    (
-        "combined_opt",
-        {
-            "Cva6RASDepth": 8,
-            "Cva6BTBEntries": 128,
-            "Cva6NrLoadBufEntries": 8,
-            "Cva6MaxOutstandingStores": 12,
-        },
-    ),
+    # Scoreboard / reorder buffer depth (default 8)
+    ("sb_2", {"Cva6NrScoreboardEntries": 2}),
+    ("sb_4", {"Cva6NrScoreboardEntries": 4}),
+    ("sb_12", {"Cva6NrScoreboardEntries": 12}),
+    ("sb_16", {"Cva6NrScoreboardEntries": 16}),
+    ("sb_24", {"Cva6NrScoreboardEntries": 24}),
+    ("sb_32", {"Cva6NrScoreboardEntries": 32}),
+    # FPGA cache optimizations
+    ("fpga_en", {"Cva6FpgaEn": 1}),
+    # D-cache size (default 32768)
+    ("dcache_8k", {"Cva6DcacheByteSize": 8192}),
+    ("dcache_16k", {"Cva6DcacheByteSize": 16384}),
+    ("dcache_64k", {"Cva6DcacheByteSize": 65536}),
+    # I-cache size (default 16384)
+    ("icache_4k", {"Cva6IcacheByteSize": 4096}),
+    ("icache_8k", {"Cva6IcacheByteSize": 8192}),
+    ("icache_32k", {"Cva6IcacheByteSize": 32768}),
+    # Cache line width in bits (default 128)
+    ("dcache_line_64", {"Cva6DcacheLineWidth": 64}),
+    ("dcache_line_256", {"Cva6DcacheLineWidth": 256}),
+    ("icache_line_64", {"Cva6IcacheLineWidth": 64}),
+    ("icache_line_256", {"Cva6IcacheLineWidth": 256}),
 ]
 
 
@@ -135,6 +169,7 @@ def load_done(csv_path: str) -> set[str]:
 
 def append_result(csv_path, name, overrides, score, mhz_score, log_dir, error=""):
     """Append one sweep result row to the CSV, writing the header if the file is new."""
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     exists = os.path.exists(csv_path)
     with open(csv_path, "a", newline="") as f:
         w = csv.writer(f)
@@ -208,10 +243,6 @@ def run_one(
             save_bitstream(name)
         elif bitstream_name:
             restore_bitstream(bitstream_name)
-        else:
-            _fpga.log(
-                "WARN", "--no-synth: reusing whatever bitstream is in the build dir"
-            )
 
         _fpga.release_existing(_fpga.SSH_HOST)
         board = _fpga.book(_fpga.SSH_HOST, _fpga.FPGA_CLASS, _fpga.FPGA_LEASE)
@@ -263,14 +294,9 @@ def main():
         help="Start from this sweep point (skip earlier ones)",
     )
     parser.add_argument(
-        "--no-synth",
+        "--rerun",
         action="store_true",
-        help="Skip synthesis, reuse existing bitstream",
-    )
-    parser.add_argument(
-        "--bitstream",
-        metavar="NAME",
-        help="With --no-synth: restore this saved bitstream before programming",
+        help="Re-run all points; reuse saved bitstream if available, else synthesize",
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="Print sweep plan and exit"
@@ -278,14 +304,14 @@ def main():
     args = parser.parse_args()
 
     if args.dry_run:
-        print(f"{'Name':<25}  Overrides")
-        print("-" * 60)
+        print(f"{'Name':<25}  {'Bitstream':<10}  Overrides")
+        print("-" * 70)
         for name, overrides in SWEEPS:
-            cfg = {**DEFAULTS, **overrides}
-            print(f"{name:<25}  {overrides or '(baseline)'}")
+            has_bit = "saved" if os.path.exists(saved_bitstream(name)) else "synth"
+            print(f"{name:<25}  {has_bit:<10}  {overrides or '(baseline)'}")
         return
 
-    done = load_done(args.results)
+    done = set() if args.rerun else load_done(args.results)
     started = args.from_name is None
 
     for name, overrides in SWEEPS:
@@ -300,9 +326,14 @@ def main():
             _fpga.log("INFO", f"Skipping {name} - already in {args.results}")
             continue
 
+        if args.rerun and os.path.exists(saved_bitstream(name)):
+            do_synth, bstream = False, name
+        else:
+            do_synth, bstream = True, None
+
         try:
             score, mhz_score, log_dir = run_one(
-                name, overrides, _fpga.COREMARK_GPT, not args.no_synth, args.bitstream
+                name, overrides, _fpga.COREMARK_GPT, do_synth, bstream
             )
             append_result(args.results, name, overrides, score, mhz_score, log_dir)
         except Exception as e:
