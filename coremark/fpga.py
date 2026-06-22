@@ -233,6 +233,7 @@ def synth():
         cwd=_REPO_ROOT,
         stdout=_logfile,
         stderr=_logfile,
+        timeout=7200,
     )
     log("OK", "Synthesis complete")
 
