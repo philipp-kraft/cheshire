@@ -321,7 +321,7 @@ def main():
             _fpga.log("INFO", f"Skipping {name} - already in {args.results}")
             continue
 
-        if args.rerun and os.path.exists(saved_bitstream(name)):
+        if os.path.exists(saved_bitstream(name)):
             do_synth, bstream = False, name
         else:
             do_synth, bstream = True, None
