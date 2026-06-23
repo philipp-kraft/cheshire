@@ -89,6 +89,8 @@ SWEEPS = [
     ("store_pipe_2", {"Cva6NrStorePipeRegs": 2}),
     # LSU buffer sizing
     ("lsu_buf_8_12", {"Cva6NrLoadBufEntries": 8, "Cva6MaxOutstandingStores": 12}),
+    # Compressed instructions
+    # ("rvc_off", {"Cva6RVC": 0}),
     # Bitmanip
     ("rvb", {"Cva6RVB": 1}),
     # Scoreboard / reorder buffer depth (default 8)
@@ -97,17 +99,37 @@ SWEEPS = [
     ("sb_16", {"Cva6NrScoreboardEntries": 16}),
     ("sb_32", {"Cva6NrScoreboardEntries": 32}),
     # D-cache size (default 32768)
+    ("dcache_256", {"Cva6DcacheByteSize": 256}),
+    ("dcache_512", {"Cva6DcacheByteSize": 512}),
+    ("dcache_1k", {"Cva6DcacheByteSize": 1024}),
+    ("dcache_2k", {"Cva6DcacheByteSize": 2048}),
+    ("dcache_4k", {"Cva6DcacheByteSize": 4096}),
     ("dcache_8k", {"Cva6DcacheByteSize": 8192}),
     ("dcache_16k", {"Cva6DcacheByteSize": 16384}),
-    ("dcache_64k", {"Cva6DcacheByteSize": 65536}),
     # I-cache size (default 16384)
+    ("icache_128", {"Cva6IcacheByteSize": 128}),
+    ("icache_256", {"Cva6IcacheByteSize": 256}),
+    ("icache_512", {"Cva6IcacheByteSize": 512}),
+    ("icache_1k", {"Cva6IcacheByteSize": 1024}),
+    ("icache_2k", {"Cva6IcacheByteSize": 2048}),
     ("icache_4k", {"Cva6IcacheByteSize": 4096}),
     ("icache_8k", {"Cva6IcacheByteSize": 8192}),
     ("icache_32k", {"Cva6IcacheByteSize": 32768}),
     # Cache line width in bits (default 128)
+    ("dcache_line_64", {"Cva6DcacheLineWidth": 64}),
     ("dcache_line_256", {"Cva6DcacheLineWidth": 256}),
     ("icache_line_64", {"Cva6IcacheLineWidth": 64}),
     ("icache_line_256", {"Cva6IcacheLineWidth": 256}),
+    # Cache set-associativity (default icache=4, dcache=8)
+    ("icache_assoc_1", {"Cva6IcacheSetAssoc": 1}),
+    ("icache_assoc_2", {"Cva6IcacheSetAssoc": 2}),
+    ("icache_assoc_8", {"Cva6IcacheSetAssoc": 8}),
+    ("dcache_assoc_1", {"Cva6DcacheSetAssoc": 1}),
+    ("dcache_assoc_2", {"Cva6DcacheSetAssoc": 2}),
+    ("dcache_assoc_4", {"Cva6DcacheSetAssoc": 4}),
+    ("dcache_assoc_16", {"Cva6DcacheSetAssoc": 16}),
+    # I$ and D$ at minimum valid size
+    ("min_l1_cache", {"Cva6IcacheByteSize": 128, "Cva6DcacheByteSize": 256}),
 ]
 
 
