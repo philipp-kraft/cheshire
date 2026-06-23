@@ -94,12 +94,8 @@ SWEEPS = [
     # Scoreboard / reorder buffer depth (default 8)
     ("sb_2", {"Cva6NrScoreboardEntries": 2}),
     ("sb_4", {"Cva6NrScoreboardEntries": 4}),
-    ("sb_12", {"Cva6NrScoreboardEntries": 12}),
     ("sb_16", {"Cva6NrScoreboardEntries": 16}),
-    ("sb_24", {"Cva6NrScoreboardEntries": 24}),
     ("sb_32", {"Cva6NrScoreboardEntries": 32}),
-    # FPGA cache optimizations
-    ("fpga_en", {"Cva6FpgaEn": 1}),
     # D-cache size (default 32768)
     ("dcache_8k", {"Cva6DcacheByteSize": 8192}),
     ("dcache_16k", {"Cva6DcacheByteSize": 16384}),
@@ -109,7 +105,6 @@ SWEEPS = [
     ("icache_8k", {"Cva6IcacheByteSize": 8192}),
     ("icache_32k", {"Cva6IcacheByteSize": 32768}),
     # Cache line width in bits (default 128)
-    ("dcache_line_64", {"Cva6DcacheLineWidth": 64}),
     ("dcache_line_256", {"Cva6DcacheLineWidth": 256}),
     ("icache_line_64", {"Cva6IcacheLineWidth": 64}),
     ("icache_line_256", {"Cva6IcacheLineWidth": 256}),
