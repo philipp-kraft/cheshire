@@ -116,7 +116,6 @@ SWEEPS = [
     ("icache_8k", {"Cva6IcacheByteSize": 8192}),
     ("icache_32k", {"Cva6IcacheByteSize": 32768}),
     # Cache line width in bits (default 128)
-    ("dcache_line_64", {"Cva6DcacheLineWidth": 64}),
     ("dcache_line_256", {"Cva6DcacheLineWidth": 256}),
     ("icache_line_64", {"Cva6IcacheLineWidth": 64}),
     ("icache_line_256", {"Cva6IcacheLineWidth": 256}),
@@ -124,7 +123,6 @@ SWEEPS = [
     ("icache_assoc_1", {"Cva6IcacheSetAssoc": 1}),
     ("icache_assoc_2", {"Cva6IcacheSetAssoc": 2}),
     ("icache_assoc_8", {"Cva6IcacheSetAssoc": 8}),
-    ("dcache_assoc_1", {"Cva6DcacheSetAssoc": 1}),
     ("dcache_assoc_2", {"Cva6DcacheSetAssoc": 2}),
     ("dcache_assoc_4", {"Cva6DcacheSetAssoc": 4}),
     ("dcache_assoc_16", {"Cva6DcacheSetAssoc": 16}),
