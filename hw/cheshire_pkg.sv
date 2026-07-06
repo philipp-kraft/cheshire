@@ -71,6 +71,31 @@ package cheshire_pkg;
     shrt_bt Cva6BTBEntries;
     shrt_bt Cva6BHTEntries;
     shrt_bt Cva6NrPMPEntries;
+    // LSU pipeline depth and buffer sizing
+    shrt_bt Cva6NrLoadPipeRegs;
+    shrt_bt Cva6NrStorePipeRegs;
+    shrt_bt Cva6NrLoadBufEntries;
+    shrt_bt Cva6MaxOutstandingStores;
+    // ISA extensions
+    bit     Cva6RVC;
+    bit     Cva6RVB;
+    // FPGA optimizations
+    bit     Cva6FpgaEn;
+    // Out-of-order execution
+    shrt_bt Cva6NrScoreboardEntries;
+    // Branch history bits
+    shrt_bt Cva6BHTHistory;
+    // Instruction cache
+    shrt_bt Cva6IcacheByteSize;
+    shrt_bt Cva6IcacheSetAssoc;
+    shrt_bt Cva6IcacheLineWidth;
+    // Data cache
+    shrt_bt Cva6DcacheByteSize;
+    shrt_bt Cva6DcacheSetAssoc;
+    shrt_bt Cva6DcacheLineWidth;
+    // TLB
+    shrt_bt Cva6InstrTlbEntries;
+    shrt_bt Cva6DataTlbEntries;
     // To reduce parameterization entropy, the range [0x2.., 0x8..) is defined to contain exactly
     // one cached, idempotent, and executable (CIE) and one non-CIE region. The parameters below
     // control the CIE region's size and whether it abuts with the top or bottom of this range.
@@ -519,6 +544,23 @@ package cheshire_pkg;
     ret.BTBEntries            = cfg.Cva6BTBEntries;
     ret.BHTEntries            = cfg.Cva6BHTEntries;
     ret.NrPMPEntries          = cfg.Cva6NrPMPEntries;
+    ret.NrLoadPipeRegs        = cfg.Cva6NrLoadPipeRegs;
+    ret.NrStorePipeRegs       = cfg.Cva6NrStorePipeRegs;
+    ret.NrLoadBufEntries      = cfg.Cva6NrLoadBufEntries;
+    ret.MaxOutstandingStores  = cfg.Cva6MaxOutstandingStores;
+    ret.RVC                   = cfg.Cva6RVC;
+    ret.RVB                   = cfg.Cva6RVB;
+    ret.FpgaEn                = cfg.Cva6FpgaEn;
+    ret.NrScoreboardEntries   = cfg.Cva6NrScoreboardEntries;
+    ret.BHTHist               = cfg.Cva6BHTHistory;
+    ret.IcacheByteSize        = cfg.Cva6IcacheByteSize;
+    ret.IcacheSetAssoc        = cfg.Cva6IcacheSetAssoc;
+    ret.IcacheLineWidth       = cfg.Cva6IcacheLineWidth;
+    ret.DcacheByteSize        = cfg.Cva6DcacheByteSize;
+    ret.DcacheSetAssoc        = cfg.Cva6DcacheSetAssoc;
+    ret.DcacheLineWidth       = cfg.Cva6DcacheLineWidth;
+    ret.InstrTlbEntries       = cfg.Cva6InstrTlbEntries;
+    ret.DataTlbEntries        = cfg.Cva6DataTlbEntries;
     // Return modified config
     return ret;
   endfunction
@@ -537,7 +579,24 @@ package cheshire_pkg;
     Cva6RASDepth      : 2,
     Cva6BTBEntries    : 32,
     Cva6BHTEntries    : 128,
-    Cva6NrPMPEntries  : 0,
+    Cva6NrPMPEntries         : 0,
+    Cva6NrLoadPipeRegs       : 1,
+    Cva6NrStorePipeRegs      : 0,
+    Cva6NrLoadBufEntries     : 2,
+    Cva6MaxOutstandingStores : 7,
+    Cva6RVC                  : 1,
+    Cva6RVB                  : 0,
+    Cva6FpgaEn               : 0,
+    Cva6NrScoreboardEntries  : 8,
+    Cva6BHTHistory           : 3,
+    Cva6IcacheByteSize       : 16384,
+    Cva6IcacheSetAssoc       : 4,
+    Cva6IcacheLineWidth      : 128,
+    Cva6DcacheByteSize       : 32768,
+    Cva6DcacheSetAssoc       : 8,
+    Cva6DcacheLineWidth      : 128,
+    Cva6InstrTlbEntries      : 16,
+    Cva6DataTlbEntries       : 16,
     Cva6ExtCieLength  : 'h2000_0000,  // [0x2.., 0x4..) is CIE, [0x4.., 0x8..) is non-CIE
     Cva6ExtCieOnTop   : 0,
     // Harts
