@@ -250,4 +250,4 @@ CHS_SW_TESTS += $(CHS_SW_TEST_DUMP)
 .PHONY: sw-clean
 sw-clean:
 	rm -f $(CHS_SW_LIB_SRCS_O) $(CHS_SW_LIBS) $(CHS_SW_TESTS) $(CHS_SW_TOOLS)
-	rm -f $(wildcard $(CHS_SW_DIR)/tests/*.o $(CHS_SW_DIR)/tests/*.elf)
+	rm -f $(wildcard $(CHS_SW_DIR)/tests/*.o $(CHS_SW_DIR)/tests/*.elf $(CHS_SW_DIR)/tests/*.gpt.bin)
