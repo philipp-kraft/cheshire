@@ -101,14 +101,18 @@ packages:
       Git: https://github.com/pulp-platform/common_verification.git
     dependencies: []
   cva6:
-    revision: 4c02b24fe7c04690f626776a92274da24f80d1da
+    revision: e98f6a5c3231c3c681ffb4ad4e105c2de5cf0723
     version: null
     source:
       Git: https://github.com/pulp-platform/cva6.git
     dependencies:
     - axi
+    - axi_riscv_atomics
+    - clic
     - common_cells
+    - common_verification
     - fpnew
+    - register_interface
     - tech_cells_generic
   dram_rtl_sim:
     revision: a764d5200a19cdd72a5237cbfb16985515a3058d
@@ -118,10 +122,10 @@ packages:
     dependencies:
     - axi
   fpnew:
-    revision: e5aa6a01b5bbe1675c3aa8872e1203413ded83d1
+    revision: 106251e502747f17d931a20db0bdbab9e1a6c2ff
     version: null
     source:
-      Git: https://github.com/pulp-platform/cvfpu.git
+      Git: https://github.com/openhwgroup/cvfpu.git
     dependencies:
     - common_cells
     - fpu_div_sqrt_mvp
